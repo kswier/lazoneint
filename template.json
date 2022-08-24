@@ -1,0 +1,493 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_lazoneint_name": {
+            "defaultValue": "lazoneint",
+            "type": "String"
+        },
+        "connections_arm_2_externalid": {
+            "defaultValue": "/subscriptions/b2becb4d-1664-48c3-a742-19c3847899cb/resourceGroups/Sandbox/providers/Microsoft.Web/connections/arm-2",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_lazoneint_name')]",
+            "location": "centralus",
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "frequency": "Month",
+                                "interval": 1
+                            },
+                            "evaluatedRecurrence": {
+                                "frequency": "Month",
+                                "interval": 1
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "For_each": {
+                            "foreach": "@body('Parse_JSON')",
+                            "actions": {
+                                "Condition": {
+                                    "actions": {
+                                        "Append_to_array_variable": {
+                                            "runAfter": {},
+                                            "type": "AppendToArrayVariable",
+                                            "inputs": {
+                                                "name": "LogicAppList",
+                                                "value": "@substring(items('For_each')?['id'], add(indexOf(items('For_each')?['id'], 'Microsoft.Logic'), 16))"
+                                            }
+                                        }
+                                    },
+                                    "runAfter": {},
+                                    "else": {
+                                        "actions": {
+                                            "Condition_3": {
+                                                "actions": {
+                                                    "Append_to_array_variable_3": {
+                                                        "runAfter": {},
+                                                        "type": "AppendToArrayVariable",
+                                                        "inputs": {
+                                                            "name": "LogicAppStandList",
+                                                            "value": "@substring(items('For_each')?['id'], add(indexOf(items('For_each')?['id'], 'Microsoft.Web'), 14))"
+                                                        }
+                                                    }
+                                                },
+                                                "runAfter": {},
+                                                "expression": {
+                                                    "and": [
+                                                        {
+                                                            "equals": [
+                                                                "@items('For_each')?['kind']",
+                                                                "functionapp,workflowapp"
+                                                            ]
+                                                        }
+                                                    ]
+                                                },
+                                                "type": "If"
+                                            }
+                                        }
+                                    },
+                                    "expression": {
+                                        "and": [
+                                            {
+                                                "equals": [
+                                                    "@items('For_each')['type']",
+                                                    "Microsoft.Logic/workflows"
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "type": "If"
+                                }
+                            },
+                            "runAfter": {
+                                "Parse_JSON": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach"
+                        },
+                        "For_each_2": {
+                            "foreach": "@variables('LogicAppList')",
+                            "actions": {
+                                "Condition_2": {
+                                    "actions": {
+                                        "Append_to_array_variable_2": {
+                                            "runAfter": {},
+                                            "type": "AppendToArrayVariable",
+                                            "inputs": {
+                                                "name": "ZoneEnabled",
+                                                "value": "@body('Read_a_resource')?['name']"
+                                            }
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Set_variable": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "expression": {
+                                        "and": [
+                                            {
+                                                "equals": [
+                                                    "@body('Parse_JSON_2')?['zoneRedundancy']",
+                                                    "Enabled"
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "type": "If"
+                                },
+                                "Parse_JSON_2": {
+                                    "runAfter": {
+                                        "Read_a_resource": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ParseJson",
+                                    "inputs": {
+                                        "content": "@body('Read_a_resource')?['properties']",
+                                        "schema": {
+                                            "properties": {
+                                                "changedTime": {
+                                                    "type": "string"
+                                                },
+                                                "createdTime": {
+                                                    "type": "string"
+                                                },
+                                                "provisioningState": {
+                                                    "type": "string"
+                                                },
+                                                "state": {
+                                                    "type": "string"
+                                                },
+                                                "version": {
+                                                    "type": "string"
+                                                },
+                                                "zoneRedundancy": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "Read_a_resource": {
+                                    "runAfter": {},
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['arm']['connectionId']"
+                                            }
+                                        },
+                                        "method": "get",
+                                        "path": "/subscriptions/@{encodeURIComponent('b2becb4d-1664-48c3-a742-19c3847899cb')}/resourcegroups/@{encodeURIComponent('Sandbox')}/providers/@{encodeURIComponent('Microsoft.Logic')}/@{encodeURIComponent(items('For_each_2'))}",
+                                        "queries": {
+                                            "x-ms-api-version": "2015-02-01-preview"
+                                        }
+                                    }
+                                },
+                                "Set_variable": {
+                                    "runAfter": {
+                                        "Parse_JSON_2": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "SetVariable",
+                                    "inputs": {
+                                        "name": "debug",
+                                        "value": "@body('Parse_JSON_2')?['zoneRedundancy']"
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "Initialize_variable_4": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach"
+                        },
+                        "For_each_3": {
+                            "foreach": "@variables('LogicAppStandList')",
+                            "actions": {
+                                "Condition_4": {
+                                    "actions": {
+                                        "Append_to_array_variable_4": {
+                                            "runAfter": {},
+                                            "type": "AppendToArrayVariable",
+                                            "inputs": {
+                                                "name": "ZoneEnabled",
+                                                "value": "@body('Read_a_resource_2')?['name']"
+                                            }
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Set_variable_2": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "expression": {
+                                        "and": [
+                                            {
+                                                "not": {
+                                                    "equals": [
+                                                        "@body('Parse_JSON_3')?['redundancyMode']",
+                                                        "None"
+                                                    ]
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    "type": "If"
+                                },
+                                "Parse_JSON_3": {
+                                    "runAfter": {
+                                        "Read_a_resource_2": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ParseJson",
+                                    "inputs": {
+                                        "content": "@body('Read_a_resource_2')?['properties']",
+                                        "schema": {
+                                            "properties": {
+                                                "name": {
+                                                    "type": "string"
+                                                },
+                                                "redundancyMode": {
+                                                    "type": "string"
+                                                },
+                                                "state": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "Read_a_resource_2": {
+                                    "runAfter": {},
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['arm']['connectionId']"
+                                            }
+                                        },
+                                        "method": "get",
+                                        "path": "/subscriptions/@{encodeURIComponent('b2becb4d-1664-48c3-a742-19c3847899cb')}/resourcegroups/@{encodeURIComponent('Sandbox')}/providers/@{encodeURIComponent('Microsoft.Web')}/@{encodeURIComponent(items('For_each_3'))}",
+                                        "queries": {
+                                            "x-ms-api-version": "2022-03-01"
+                                        }
+                                    }
+                                },
+                                "Set_variable_2": {
+                                    "runAfter": {
+                                        "Parse_JSON_3": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "SetVariable",
+                                    "inputs": {
+                                        "name": "debug",
+                                        "value": "@body('Parse_JSON_3')?['redundancyMode']"
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "For_each_2": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach"
+                        },
+                        "Initialize_variable": {
+                            "runAfter": {},
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "LogicAppList",
+                                        "type": "array"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_2": {
+                            "runAfter": {
+                                "Initialize_variable_5": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "ZoneEnabled",
+                                        "type": "array"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_3": {
+                            "runAfter": {
+                                "For_each_3": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "OutputZoneEnabled",
+                                        "type": "string",
+                                        "value": "@{join(variables('ZoneEnabled'), ',')}"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_4": {
+                            "runAfter": {
+                                "For_each": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "debug",
+                                        "type": "string"
+                                    }
+                                ]
+                            }
+                        },
+                        "Initialize_variable_5": {
+                            "runAfter": {
+                                "Initialize_variable": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "LogicAppStandList",
+                                        "type": "array"
+                                    }
+                                ]
+                            }
+                        },
+                        "List_resources_by_resource_group": {
+                            "runAfter": {
+                                "Initialize_variable_2": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['arm']['connectionId']"
+                                    }
+                                },
+                                "method": "get",
+                                "path": "/subscriptions/@{encodeURIComponent('b2becb4d-1664-48c3-a742-19c3847899cb')}/resourceGroups/@{encodeURIComponent('Sandbox')}/resources",
+                                "queries": {
+                                    "x-ms-api-version": "2016-06-01"
+                                }
+                            }
+                        },
+                        "Parse_JSON": {
+                            "runAfter": {
+                                "List_resources_by_resource_group": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ParseJson",
+                            "inputs": {
+                                "content": "@body('List_resources_by_resource_group')?['value']",
+                                "schema": {
+                                    "items": {
+                                        "properties": {
+                                            "id": {
+                                                "type": "string"
+                                            },
+                                            "identity": {
+                                                "properties": {
+                                                    "principalId": {
+                                                        "type": "string"
+                                                    },
+                                                    "tenantId": {
+                                                        "type": "string"
+                                                    },
+                                                    "type": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "kind": {
+                                                "type": "string"
+                                            },
+                                            "location": {
+                                                "type": "string"
+                                            },
+                                            "managedBy": {
+                                                "type": "string"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "sku": {
+                                                "properties": {
+                                                    "capacity": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "tier": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "tags": {
+                                                "properties": {},
+                                                "type": "object"
+                                            },
+                                            "type": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "name",
+                                            "type",
+                                            "location"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "arm": {
+                                "connectionId": "[parameters('connections_arm_2_externalid')]",
+                                "connectionName": "arm-2",
+                                "id": "/subscriptions/b2becb4d-1664-48c3-a742-19c3847899cb/providers/Microsoft.Web/locations/centralus/managedApis/arm"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}
